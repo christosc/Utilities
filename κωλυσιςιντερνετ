@@ -1,0 +1,100 @@
+#! /bin/bash
+#  netblock
+
+# set -e
+set -u
+
+CMD_NAME=$(basename $0)
+function usage {
+	printf "\nUsage: $CMD_NAME\n"
+}
+
+
+
+
+
+
+
+
+
+
+
+pretty_print_time() {
+	days=$(($1 / 86400))
+	hours=$(($1 / 3600))
+	mins=$((($1 % 3600)/60))
+	secs=$((($1 % 3600)%60))
+	if [ $days -gt 0 ];then
+		printf "${bold}\033[1m%d ἡμέρες \033[0m${offbold}"
+	fi
+	printf "${bold} %d:%d:%d ὧρες${offbold}" $hours $mins $secs
+
+}
+
+
+
+bold=`tput smso`
+offbold=`tput rmso`
+
+PRINTER=192.168.1.15
+
+if ` sudo ipfw list | grep "deny tcp from not $PRINTER to not $PRINTER" &> /dev/null`; then
+	echo -e "`date`: \033[1mΣύνδεσις Internet ἤδη κεκωλυμένη.\033[0m"
+    #  sudo -k
+	exit 0
+fi
+
+clear
+
+
+RANDOM=$(date "+%s")  # σπείρω (seed) τὸν γεννήτορα τυχαίων ἀριθμῶν 
+FW_RUL=`expr $RANDOM+1`
+
+
+
+function delete_rule {
+	# exec 2> /dev/null  # μήπως τυχὸν ἔχω διαγράψει ἐξωτερικῶς τὸν κανόνα· νὰ μὴ ἐμφανίσῃ διαγνωστικὸν μήνυμα σφάλματος…
+	
+	RULE=$( sudo ipfw list | grep "deny tcp from not $PRINTER to not $PRINTER" | awk '{print $1}')
+	sudo ipfw delete $RULE
+	
+}
+
+function set_rule {
+	 
+	 sudo ipfw -q add $1 deny tcp from not $PRINTER to not $PRINTER
+	 sudo -k
+}
+
+set_rule $FW_RUL
+# sudo -k
+# echo -e "`date`: \033[1mΣύνδεσις Internet ἐκωλύθη.\033[0m"
+
+
+#trap "delete_rule;printf \"\nInternet connection restored\n\"" SIGTERM SIGINT SIGABRT SIGHUP SIGQUIT
+
+trap 'echo;if delete_rule; then echo;echo Σύνδεσις Internet ἀποκατεστάθη;exit 0; fi' SIGTERM SIGINT SIGABRT SIGHUP SIGQUIT
+# trap "delete_rule $FW_RUL;printf \"\nInternet connection restored\n\";bg $$" SIGTSTP
+# trap "set_rule $FW_RUL"             SIGCONT
+
+echo -e "\033[1m\t\tΚΩΛΥΣΙΣ INTERNET"
+echo -e "\t\t================\033[0m\n"
+echo -e "Ἀρχὴ τῇ \033[1m`date`\033[0m\n"
+start_time=$(date "+%s")
+time=$start_time
+# echo
+while [ 0 ];do
+	printf "${bold}Χρόνος ἐκτὸς Internet: ${offbold}"
+	pretty_print_time $(($time - $start_time)) 
+	sleep 1 &
+	wait $!
+	time=$(date "+%s")
+	printf "\r"
+done
+# printf "\rTime remaining to restore Internet connection: "
+# pretty_print_time 0
+# echo
+# delete_rule $FW_RUL
+# printf "\nInternet connection restored\n"
+#sleep $(($1*60)) 
+
